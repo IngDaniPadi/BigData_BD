@@ -2,6 +2,6 @@ import duckdb
 
 con = duckdb.connect("music.duckdb")
 
-result = con.execute("SELECT * FROM users LIMIT 5").fetchdf()
+result = con.execute("SELECT * FROM sqlite_master LIMIT 5").fetchdf()
 
 print(result)
