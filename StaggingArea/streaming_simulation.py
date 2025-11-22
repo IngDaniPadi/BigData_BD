@@ -2,6 +2,6 @@ import duckdb
 
 con = duckdb.connect("music.duckdb")
 
-result = con.execute("SELECT * FROM users LIMIT 5").fetchdf()
+df = con.execute("SELECT COUNT(*) FROM user_top_tracks").fetchall()
 
-print(result)
+print(df)
