@@ -2,6 +2,7 @@ import duckdb
 
 con = duckdb.connect("music.duckdb")
 
-df = con.execute("SELECT COUNT(*) FROM user_top_tracks").fetchall()
+tables_name = [t[0] for t in con.execute("SHOW TABLES").fetchall()] 
 
-print(df)
+for name in tables_name:
+    print(f"Estamos usando la tabla {name}")
