@@ -15,7 +15,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
 
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
 
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
 
@@ -24,3 +24,13 @@ services:
 
 volumes:
   kafka_data:
+
+###primero este comando###
+# docker exec -it kafka bash
+
+###luego todos estos###
+#   kafka-topics --create \
+#   --topic music_stream \
+#   --bootstrap-server localhost:9092 \
+#   --partitions 10 \
+#   --replication-factor 1
