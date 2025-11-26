@@ -17,7 +17,7 @@ import time
 
 DUCKDB_PATH = "music.duckdb"
 TABLE_NAME = "users"            # <-- cámbiala o automatízala
-CHUNK_SIZE = 10000              # filas por lote
+CHUNK_SIZE = 100000              # filas por lote
 TOPIC = "music_stream"
 BOOTSTRAP_SERVERS = "localhost:9092"
 
