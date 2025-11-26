@@ -206,3 +206,5 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 *.duckdb
+StreamingArea/output_parquet/
+StreamingArea/checkpoint_parquet/
