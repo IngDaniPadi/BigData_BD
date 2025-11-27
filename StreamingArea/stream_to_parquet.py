@@ -1,21 +1,25 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import (
-    col, from_json, expr,
-    window, count, avg, sum as spark_sum
-)
+from pyspark.sql.functions import col, from_json, expr, window, count, avg, sum as spark_sum
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
+import os
 
 # ==========================================
 # CONFIG
 # ==========================================
-LIMIT = 200000  # Enviar solo 20M
-BUCKET = "bucket-bigdata-music2"
-DATASET = "bigdata_dataset"
+LIMIT = 20_000_000  # Límite de filas
+BUCKET = "bucket-bigdata-music"  # Bucket temporal en GCS
+PROJECT = "datalake-proyecto"
+DATASET = "music_dw"
 
-TABLE_FULL = f"{DATASET}.raw_events_partition"
-TABLE_PART = f"{DATASET}.raw_events_no_partition"
+TABLE_FULL = f"{DATASET}.events_full"
+TABLE_PART = f"{DATASET}.events_partitioned"
 
-# Esquema del JSON de Kafka
+# JSON de credenciales de Google Cloud
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\walfr\keys\datalake-proyecto-c29dd470a592.json"
+
+# ==========================================
+# ESQUEMA DEL JSON DE KAFKA
+# ==========================================
 schema = StructType([
     StructField("event_id", StringType()),
     StructField("user_id", IntegerType()),
@@ -34,8 +38,14 @@ schema = StructType([
 spark = SparkSession.builder \
     .appName("KafkaToBigQuery_Fase2") \
     .config("spark.jars.packages",
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,"
-            "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.36.1") \
+        "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,"
+        "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.36.1,"
+        "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.13") \
+    .config("spark.driver.memory", "8g") \
+    .config("spark.executor.memory", "8g") \
+    .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
+    .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile",
+            r"C:\Users\walfr\keys\datalake-proyecto-c29dd470a592.json") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
@@ -45,11 +55,11 @@ acc = spark.sparkContext.accumulator(0)
 # LECTURA DESDE KAFKA
 # ==========================================
 df_raw = spark.readStream \
-   .format("kafka") \
-   .option("kafka.bootstrap.servers", "localhost:9092") \
-   .option("subscribe", "music_stream") \
-   .option("startingOffsets", "earliest") \
-   .load()
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "music_stream") \
+    .option("startingOffsets", "earliest") \
+    .load()
 
 # ==========================================
 # PARSEAR JSON + LIMPIEZA
@@ -78,43 +88,37 @@ df_windowed = df_clean \
     )
 
 # ==========================================
-# PROCESAMIENTO POR LOTE Y ENVÍO A BIGQUERY
+# FUNCION FOREACHBATCH PARA BIGQUERY
 # ==========================================
 def process_batch(df, epoch_id):
     global acc
 
     batch_count = df.count()
     acc += batch_count
+    print(f"→ Batch {epoch_id}: {batch_count} filas | Total acumulado: {acc.value}")
 
-    print(f"→ Batch {epoch_id}: {batch_count} filas | Total: {acc.value}")
-
-    # ================================
     # Guardar en tabla completa
-    # ================================
     df.write \
         .format("bigquery") \
         .option("table", TABLE_FULL) \
         .option("temporaryGcsBucket", BUCKET) \
+        .option("project", PROJECT) \
         .mode("append") \
         .save()
 
-    # ================================
     # Guardar tabla particionada
-    # ================================
     df.write \
         .format("bigquery") \
         .option("table", TABLE_PART) \
         .option("temporaryGcsBucket", BUCKET) \
+        .option("project", PROJECT) \
         .mode("append") \
         .save()
 
-    # ================================
-    # Detener cuando llegue a 20M
-    # ================================
+    # Detener cuando se alcance el límite
     if acc.value >= LIMIT:
         print("✔ Se alcanzó el límite de 20M. Deteniendo stream…")
         spark.streams.active[0].stop()
-
 
 # ==========================================
 # INICIAR STREAM
