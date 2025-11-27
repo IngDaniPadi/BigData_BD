@@ -208,3 +208,4 @@ __marimo__/
 *.duckdb
 StreamingArea/output_parquet/
 StreamingArea/checkpoint_parquet/
+StreamingArea/checkpoint_kafka_bq/
