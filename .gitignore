@@ -210,3 +210,4 @@ StreamingArea/output_parquet/
 StreamingArea/checkpoint_parquet/
 StreamingArea/checkpoint_bigquery/
 StreamingArea/checkpoint_kafka_bq/
+datalake-proyecto-c29dd470a592.json
