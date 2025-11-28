@@ -1,82 +1,66 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, count, sum as sum_, avg
 import os
 
 # ==========================================
-# CONFIG
+# CONFIGURACIÓN
 # ==========================================
 os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
 os.environ["SPARK_LOCAL_HOSTNAME"] = "localhost"
 
+# Ruta a tu archivo de credenciales JSON
 KEYFILE = r"..\datalake-proyecto-c29dd470a592.json"
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = KEYFILE
 
+# Proyectos y dataset
 PROJECT = "datalake-proyecto"
 DATASET = "music_dw"
+TABLE_ANALYTICA = f"{DATASET}.tabla_analitica_final"
 
-TABLE_FULL = "music_dw.events_full"
-TABLE_TARGET = "music_dw.tabla_analitica_final"
+# Ruta de exportación a GCS
+GCS_OUTPUT_PATH = "gs://mi-bucket-parquet/tabla_analitica_final_parquet"
 
 # ==========================================
-# SPARK SESSION SIN GCS CONNECTOR
+# CREAR SPARK SESSION CON CONECTORES
 # ==========================================
 spark = (
     SparkSession.builder
-    .appName("PySpark-BigQuery-Analitico")
+    .appName("BigQuery-to-GCS-Parquet")
     .master("local[*]")
     .config("spark.driver.host", "127.0.0.1")
     .config("spark.driver.bindAddress", "127.0.0.1")
-
-    # SOLO BigQuery connector (sin gcs-connector)
     .config(
         "spark.jars.packages",
-        "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.36.1"
+        "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.36.1,"
+        "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.10"
     )
-
-    # Autenticación
+    .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+    .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
     .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
     .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", KEYFILE)
-
-    .config("parentProject", PROJECT)
-    .config("materializationProject", PROJECT)
-    .config("materializationDataset", DATASET)
-
     .getOrCreate()
 )
+
 
 spark.sparkContext.setLogLevel("WARN")
 print("✓ Spark iniciada correctamente")
 
 # ==========================================
-# LECTURA
+# LECTURA DE BIGQUERY
 # ==========================================
-df_events = (
+df_kpis = (
     spark.read.format("bigquery")
-    .option("table", TABLE_FULL)
+    .option("table", TABLE_ANALYTICA)
+    .option("parentProject", PROJECT)
     .load()
 )
-
-print("Eventos:", df_events.count())
-
-# ==========================================
-# KPIs
-# ==========================================
-df_kpis = df_events.groupBy("artist_name").agg(
-    count("total_eventos").alias("total_events"),
-    sum_("suma_playcount").alias("total_playcount"),
-    avg("promedio_playcount").alias("avg_playcount")
-)
+print(f"✓ Leídos {df_kpis.count()} registros desde BigQuery")
 
 # ==========================================
-# ESCRITURA DIRECTA (SIN GCS)
+# ESCRITURA A GCS COMO PARQUET
 # ==========================================
-(
-    df_kpis.write
-    .format("bigquery")
-    .option("table", TABLE_TARGET)
-    .option("writeMethod", "direct")   # ← la clave
-    .mode("overwrite")
-    .save()
-)
+df_kpis.write \
+    .format("parquet") \
+    .mode("overwrite") \
+    .save(GCS_OUTPUT_PATH)
 
-print("✓ Escrito correctamente en BigQuery")
+print(f"✓ DataFrame exportado correctamente a GCS en: {GCS_OUTPUT_PATH}")

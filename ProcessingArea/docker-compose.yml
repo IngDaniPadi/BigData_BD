@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  dremio:
+    image: dremio/dremio-oss
+    container_name: dremio2
+    ports:
+      - "9047:9047"
+      - "31010:31010"
+    volumes:
+      - dremio_data:/opt/dremio/data
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:9.5.10
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-simple-json-datasource
+    depends_on:
+      - dremio
+      - proxy
+    restart: unless-stopped
+
+  proxy:
+    build: ./grafana-dremio-proxy
+    container_name: dremio_proxy
+    environment:
+      DREMIO_HOST: dremio2
+      DREMIO_PORT: 9047
+      DREMIO_USER: danipadi
+      DREMIO_PASSWORD: D4n13l1216+
+    ports:
+      - "5000:5000"
+    depends_on:
+      - dremio
+    restart: unless-stopped
+
+volumes:
+  dremio_data:
