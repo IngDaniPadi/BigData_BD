@@ -86,7 +86,7 @@ else:
 
 print("\nConstruyendo dataset final (50M)...")
 df_final = pd.concat([df_tracks, df_artists, df_sample], ignore_index=True)
-print(f"🔥 Total final: {len(df_final):,}")
+print(f"Total final: {len(df_final):,}")
 
 # ================================
 # CONFIGURAR PRODUCTOR KAFKA
